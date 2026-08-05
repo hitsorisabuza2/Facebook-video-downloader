@@ -74,15 +74,33 @@ export async function onRequestPost(context) {
     const hdMatch = html.match(/"hd_src"\s*:\s*"([^"]+)"/);
     const sdMatch = html.match(/"sd_src"\s*:\s*"([^"]+)"/);
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+
+    // Try multiple thumbnail extraction patterns
     const thumbMatch =
+      // JSON blob: "thumbnailUrl":"..."
       html.match(/"thumbnailUrl"\s*:\s*"([^"]+)"/) ||
-      html.match(/"og:image"\s+content="([^"]+)"/);
+      // JSON blob: "preview_image_url":"..."
+      html.match(/"preview_image_url"\s*:\s*"([^"]+)"/) ||
+      // JSON blob: "image":{"uri":"..."}
+      html.match(/"image"\s*:\s*\{"uri"\s*:\s*"([^"]+)"/) ||
+      // <meta property="og:image" content="...">
+      html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) ||
+      // <meta content="..." property="og:image">
+      html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i) ||
+      // <meta name="og:image" content="...">
+      html.match(/<meta[^>]+name="og:image"[^>]+content="([^"]+)"/i);
 
     if (!hdMatch && !sdMatch) {
       return jsonError(
         "No download links found. The video is likely private, a live stream, or region-restricted.",
         400,
       );
+    }
+
+    // If no thumbnail found from embed HTML, try Graph API picture endpoint
+    let thumbnailUrl = thumbMatch ? clean(thumbMatch[1]) : null;
+    if (!thumbnailUrl) {
+      thumbnailUrl = await fetchGraphThumbnail(videoId);
     }
 
     return new Response(
@@ -95,7 +113,7 @@ export async function onRequestPost(context) {
           : hdMatch
             ? clean(hdMatch[1])
             : null,
-        thumbnail: thumbMatch ? clean(thumbMatch[1]) : null,
+        thumbnail: thumbnailUrl,
       }),
       {
         status: 200,
@@ -108,6 +126,45 @@ export async function onRequestPost(context) {
   } catch (err) {
     return jsonError("Internal server error: " + String(err), 500);
   }
+}
+
+/**
+ * Try Facebook's public Graph API picture endpoint.
+ * For public videos this returns a redirect to the thumbnail image.
+ * Returns the final image URL, or null on failure.
+ */
+async function fetchGraphThumbnail(videoId) {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${videoId}/picture?redirect=0`,
+      {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; bot)" },
+      },
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json?.data?.url) return json.data.url;
+  } catch {
+    // ignore
+  }
+
+  // Fallback: follow redirect directly
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${videoId}/picture`,
+      {
+        redirect: "follow",
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; bot)" },
+      },
+    );
+    if (res.ok && res.url && !res.url.includes("graph.facebook.com")) {
+      return res.url;
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
 }
 
 function extractVideoId(url) {

@@ -50,12 +50,21 @@ function HistoryCard({
                 src={item.thumbnail}
                 alt={item.title}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                  (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty("display", "flex");
+                }}
               />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                No thumbnail
-              </div>
-            )}
+            ) : null}
+            <div
+              className="w-full h-full flex-col items-center justify-center text-muted-foreground gap-1"
+              style={{ display: item.thumbnail ? "none" : "flex" }}
+            >
+              <svg viewBox="0 0 24 24" className="h-8 w-8 fill-[#1877F2] opacity-60" xmlns="http://www.w3.org/2000/svg">
+                <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073c0 6.028 4.388 11.02 10.125 11.928v-8.44H7.078v-3.488h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.488h-2.796v8.44C19.612 23.093 24 18.1 24 12.073z"/>
+              </svg>
+              <span className="text-[10px]">No preview</span>
+            </div>
 
             {/* Hover overlay — title */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 flex flex-col justify-end">
