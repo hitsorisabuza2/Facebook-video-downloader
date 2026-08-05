@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Facebook Video Downloader"
+description = "A clean web app for downloading Facebook videos in HD and SD. Users paste a Facebook video URL and get instant download links. Features download history and stats. Deployed on Cloudflare Pages."
+version = "1.0.0"
+id = "artifacts/fb-downloader"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19463
+
+[services.development]
+run = "pnpm --filter @workspace/fb-downloader run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fb-downloader", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/fb-downloader/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19463"
+BASE_PATH = "/"
